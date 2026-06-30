@@ -130,6 +130,63 @@ body {
   }
 }
 
+/* ------------------------------------------------- Header actions / refresh */
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.refresh-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  color: var(--ink);
+}
+
+.refresh-btn:active {
+  background: var(--bg);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.refresh-btn svg {
+  display: block;
+}
+
+.refresh-btn.is-spinning svg {
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-btn.is-spinning svg {
+    animation: none;
+  }
+}
+
 /* ------------------------------------------------------------------ Card */
 
 .card {

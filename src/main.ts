@@ -47,6 +47,23 @@ function setPill(status: SyncStatus): void {
   if (el) el.innerHTML = pillHtml(status, state?.syncedAt ?? "");
 }
 
+/** Top-right header cluster: status pill + manual "force sync" button. */
+function headerActions(status: SyncStatus, syncedAt: string): string {
+  return `
+    <div class="header__actions">
+      <div id="pill">${pillHtml(status, syncedAt)}</div>
+      <button id="refresh" class="refresh-btn" type="button"
+              aria-label="Refresh now" title="Refresh now">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+      </button>
+    </div>`;
+}
+
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
@@ -135,7 +152,7 @@ function render(): void {
         <h1 class="header__title">Leads Monitor</h1>
         <p class="header__subtitle">${esc(month)} · today vs typical day</p>
       </div>
-      <div id="pill">${pillHtml(s.status, s.syncedAt)}</div>
+      ${headerActions(s.status, s.syncedAt)}
     </header>
     ${stripHtml(s.data)}
     ${renderFlag(s.data)}
@@ -146,6 +163,23 @@ function render(): void {
 
   drawChart();
   wireToggle();
+  wireRefresh();
+}
+
+/** Wire the manual "force sync" button. Spins while a fetch is in flight. */
+function wireRefresh(): void {
+  const btn = document.getElementById("refresh") as HTMLButtonElement | null;
+  if (!btn) return;
+  if (fetching) {
+    btn.classList.add("is-spinning");
+    btn.disabled = true;
+  }
+  btn.addEventListener("click", () => {
+    if (fetching) return;
+    btn.classList.add("is-spinning");
+    btn.disabled = true;
+    void refresh(); // re-renders on completion, restoring the button
+  });
 }
 
 function drawChart(): void {
@@ -217,11 +251,12 @@ function init(): void {
         <h1 class="header__title">Leads Monitor</h1>
         <p class="header__subtitle">loading…</p>
       </div>
-      <div id="pill">${pillHtml("syncing", "")}</div>
+      ${headerActions("syncing", "")}
     </header>
     <div class="skeleton">Loading leads…</div>
   `;
 
+  wireRefresh();
   void refresh();
 
   // Poll every 5 minutes.
