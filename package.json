@@ -1,0 +1,19 @@
+{
+  "name": "leads-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Mobile-first dashboard tracking today's leads vs a typical day, from a Google Sheet.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}

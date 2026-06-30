@@ -1,0 +1,45 @@
+{
+  "_comment": "Reference fixture for the Leads Monitor. Mirrors the exact JSON contract the app expects from the data endpoint. Use it for local dev, Storybook/preview, error/offline fallback, and acceptance tests. Numbers are real values pulled from the June 2026 tab + Cumul. Leads tab.",
+  "syncedAt": "2026-06-30T13:05:00+10:00",
+  "today": {
+    "date": "30/06/2026",
+    "label": "Today",
+    "cumulative": [1, 5, 8, 10, 11, 11, 25, 50, 68, 81, 90, 99, 110, 119, 119, 119, 119, 119, 119, 119, 119, 119, 119, 119]
+  },
+  "benchmark": {
+    "high": [9, 14, 16, 18, 21, 25, 36, 55, 81, 114, 141, 159, 175, 191, 206, 226, 243, 259, 275, 299, 317, 332, 346, 353],
+    "low": [5, 8, 8, 10, 11, 13, 19, 30, 44, 61, 76, 86, 94, 103, 111, 122, 131, 139, 148, 161, 171, 179, 186, 190]
+  },
+  "daily": [
+    {"date": "01/06/2026", "paidLeads": 254, "revenue": 6024, "cpl": 13.69, "adjProfit": 2545, "roas": 1.73},
+    {"date": "02/06/2026", "paidLeads": 343, "revenue": 8134, "cpl": 14.37, "adjProfit": 3206, "roas": 1.65},
+    {"date": "03/06/2026", "paidLeads": 335, "revenue": 7945, "cpl": 14.01, "adjProfit": 3250, "roas": 1.69},
+    {"date": "04/06/2026", "paidLeads": 395, "revenue": 9367, "cpl": 12.19, "adjProfit": 4554, "roas": 1.95},
+    {"date": "05/06/2026", "paidLeads": 317, "revenue": 7518, "cpl": 13.63, "adjProfit": 3196, "roas": 1.74},
+    {"date": "06/06/2026", "paidLeads": 326, "revenue": 7731, "cpl": 13.86, "adjProfit": 3213, "roas": 1.71},
+    {"date": "07/06/2026", "paidLeads": 365, "revenue": 8656, "cpl": 13.66, "adjProfit": 3668, "roas": 1.74},
+    {"date": "08/06/2026", "paidLeads": 374, "revenue": 8869, "cpl": 13.01, "adjProfit": 4005, "roas": 1.82},
+    {"date": "09/06/2026", "paidLeads": 311, "revenue": 7375, "cpl": 13.79, "adjProfit": 3086, "roas": 1.72},
+    {"date": "10/06/2026", "paidLeads": 315, "revenue": 7470, "cpl": 13.02, "adjProfit": 3368, "roas": 1.82},
+    {"date": "11/06/2026", "paidLeads": 336, "revenue": 7968, "cpl": 13.38, "adjProfit": 3472, "roas": 1.77},
+    {"date": "12/06/2026", "paidLeads": 287, "revenue": 6806, "cpl": 14.13, "adjProfit": 2752, "roas": 1.68},
+    {"date": "13/06/2026", "paidLeads": 300, "revenue": 7115, "cpl": 12.31, "adjProfit": 3422, "roas": 1.93},
+    {"date": "14/06/2026", "paidLeads": 324, "revenue": 7684, "cpl": 15.02, "adjProfit": 2819, "roas": 1.58},
+    {"date": "15/06/2026", "paidLeads": 276, "revenue": 6545, "cpl": 15.9, "adjProfit": 2157, "roas": 1.49},
+    {"date": "16/06/2026", "paidLeads": 323, "revenue": 7660, "cpl": 13.21, "adjProfit": 3393, "roas": 1.8},
+    {"date": "17/06/2026", "paidLeads": 256, "revenue": 6071, "cpl": 16.21, "adjProfit": 1922, "roas": 1.46},
+    {"date": "18/06/2026", "paidLeads": 303, "revenue": 7186, "cpl": 13.85, "adjProfit": 2989, "roas": 1.71},
+    {"date": "19/06/2026", "paidLeads": 290, "revenue": 6877, "cpl": 14.4, "adjProfit": 2701, "roas": 1.65},
+    {"date": "20/06/2026", "paidLeads": 260, "revenue": 6166, "cpl": 14.78, "adjProfit": 2323, "roas": 1.6},
+    {"date": "21/06/2026", "paidLeads": 372, "revenue": 8822, "cpl": 13.43, "adjProfit": 3827, "roas": 1.77},
+    {"date": "22/06/2026", "paidLeads": 358, "revenue": 8490, "cpl": 13.85, "adjProfit": 3531, "roas": 1.71},
+    {"date": "23/06/2026", "paidLeads": 306, "revenue": 7257, "cpl": 15.18, "adjProfit": 2612, "roas": 1.56},
+    {"date": "24/06/2026", "paidLeads": 320, "revenue": 7589, "cpl": 15.01, "adjProfit": 2785, "roas": 1.58},
+    {"date": "25/06/2026", "paidLeads": 279, "revenue": 6616, "cpl": 15.83, "adjProfit": 2201, "roas": 1.5},
+    {"date": "26/06/2026", "paidLeads": 272, "revenue": 6450, "cpl": 14.74, "adjProfit": 2440, "roas": 1.61},
+    {"date": "27/06/2026", "paidLeads": 264, "revenue": 6261, "cpl": 14.71, "adjProfit": 2377, "roas": 1.61},
+    {"date": "28/06/2026", "paidLeads": 278, "revenue": 6593, "cpl": 14.2, "adjProfit": 2646, "roas": 1.67},
+    {"date": "29/06/2026", "paidLeads": 272, "revenue": 6450, "cpl": 11.24, "adjProfit": 3392, "roas": 2.11},
+    {"date": "30/06/2026", "paidLeads": 119, "revenue": 2822, "cpl": 0, "adjProfit": 2822, "roas": null}
+  ]
+}
