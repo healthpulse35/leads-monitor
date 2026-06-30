@@ -43,10 +43,22 @@ JSON contract.
 
 ## Deploy
 
-`npm run build` emits a fully static `dist/`. Deploy to Netlify, Vercel, or
-GitHub Pages. `vite.config.ts` uses `base: "./"` so relative asset paths work on
-project-subpath hosts (e.g. GitHub Pages). Set `VITE_DATA_URL` as a build-time
-env var in your host (it's inlined at build time — no secrets are involved).
+**Live:** https://healthpulse35.github.io/leads-monitor/
+
+Deployment is automated via GitHub Actions (`.github/workflows/deploy.yml`):
+every push to `main` builds the app and publishes `dist/` to GitHub Pages. The
+build-time `VITE_DATA_URL` is stored as a repo **variable** (Settings → Secrets
+and variables → Actions → Variables), so it's not committed to source; if it's
+unset the build falls back to the bundled fixture.
+
+`npm run build` also emits a standalone static `dist/` you can drop on any host
+(Netlify, Vercel, …). `vite.config.ts` uses `base: "./"` so relative asset paths
+work on project-subpath hosts like GitHub Pages.
+
+To point at a different endpoint, update the `VITE_DATA_URL` repo variable
+(`gh variable set VITE_DATA_URL --body "<url>"`) and re-run the workflow — note a
+*new* Apps Script deployment mints a *new* `/exec` URL, while updating an existing
+deployment keeps the same one.
 
 ## Project layout
 
