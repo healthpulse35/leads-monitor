@@ -9,6 +9,10 @@ const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined) ?? "";
 // Vite serves /public at the root; `base: "./"` makes this relative in builds.
 const FIXTURE_URL = `${import.meta.env.BASE_URL}leads-sample.json`;
 
+// Abort a live fetch that stalls, so a slow/unreachable endpoint falls back to
+// the fixture instead of leaving the UI stuck on "Syncing…" (§3.4).
+const FETCH_TIMEOUT_MS = 12_000;
+
 export interface FetchResult {
   data: LeadsData;
   isFixture: boolean;
@@ -40,9 +44,15 @@ function withCacheBust(url: string): string {
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ac.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Minimal structural validation so a malformed response falls back cleanly. */
