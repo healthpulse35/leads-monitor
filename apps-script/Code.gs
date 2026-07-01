@@ -1,63 +1,126 @@
 /**
  * Leads Monitor — Apps Script data endpoint (§3.2).
  *
- * Reads ONLY the two aggregate tabs (daily summary + Cumul. Leads) and returns
- * the JSON contract the dashboard expects. Never exposes lead-level/PII tabs.
+ * Reads ONLY aggregate tabs (HD daily summary + Cumul. Leads, and the ED daily
+ * summary) and returns the JSON contract the dashboard expects. It never touches
+ * the lead-level/PII tabs (e.g. the ED sheet's first tab).
+ *
+ * Monthly tabs are resolved automatically: each month's tab is named like
+ * "June 2026" / "July 2026", and the script uses the current month's tab,
+ * falling back to the most recent month that actually has data (so nothing
+ * breaks on the 1st of a month before that tab is populated). No hand-editing.
  *
  * Deploy: Extensions ▸ Apps Script ▸ paste this file ▸ Deploy ▸ New deployment
  *   - Type: Web app
- *   - Execute as: Me
+ *   - Execute as: Me            (so it can read both sheets you own)
  *   - Who has access: Anyone
  * Copy the resulting /exec URL into the dashboard's .env as VITE_DATA_URL.
+ * (Updating an EXISTING deployment keeps the same URL; a NEW deployment mints
+ *  a new one — update .env if it changes.)
  */
 
 // ==== CONFIG ====
-const SPREADSHEET_ID = '1CH7e50P8ZWeK1uL6GQyWdhFobPUDROmThzE2vmXSxxo';
-const DAILY_TAB = 'June 2026';      // monthly daily-summary tab (confirmed against the sheet)
-const CUMUL_TAB = 'Cumul. Leads';   // the cumulative dashboard tab
+const HD_SPREADSHEET_ID = '1CH7e50P8ZWeK1uL6GQyWdhFobPUDROmThzE2vmXSxxo';
+const ED_SPREADSHEET_ID = '1c2eC_xTlSveJd5srMkz35NrCX6CdGPjqLPjZb9qUNyg';
+const CUMUL_TAB = 'Cumul. Leads';   // the HD cumulative dashboard tab
 
 function doGet() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(HD_SPREADSHEET_ID);
   const tz = ss.getSpreadsheetTimeZone();
+  const daily = readDaily_(ss, tz);
   const out = {
     syncedAt: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ssXXX"),
-    today: readToday_(ss),
+    today: {
+      // The Cumul. Leads "Today" row tracks TODAY(); label the day with the
+      // newest daily row so it stays consistent with the daily table.
+      date: daily.length ? daily[daily.length - 1].date : '',
+      label: 'Today',
+      cumulative: readCumulRow_(ss, 'Today')
+    },
     benchmark: {
       high: readCumulRow_(ss, 'Benchmark High'),
       low: readCumulRow_(ss, 'Benchmark Low')
     },
-    daily: readDaily_(ss)
+    daily: daily,
+    ed: readEd_()
   };
   return ContentService.createTextOutput(JSON.stringify(out))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function readToday_(ss) {
-  return {
-    date: readCumulDateForLabel_(ss, 'Today'),
-    label: 'Today',
-    cumulative: readCumulRow_(ss, 'Today')
-  };
+// ==== HD monthly daily-summary ====
+
+/**
+ * Reads the HD daily-summary rows from the current month's tab, walking back up
+ * to a year to the most recent monthly tab that exists AND has data rows.
+ */
+function readDaily_(ss, tz) {
+  const d = new Date();
+  for (let i = 0; i < 13; i++) {
+    const name = Utilities.formatDate(d, tz, 'MMMM yyyy'); // e.g. "June 2026"
+    const sh = ss.getSheetByName(name);
+    if (sh) {
+      const rows = readDailyFromSheet_(sh, ss);
+      if (rows.length) return rows;
+    }
+    d.setMonth(d.getMonth() - 1);
+  }
+  return [];
 }
+
+function readDailyFromSheet_(sh, ss) {
+  const values = sh.getDataRange().getValues();
+  let h = -1;
+  const col = {};
+  for (let r = 0; r < values.length; r++) {
+    const row = values[r].map(function (x) { return String(x).trim(); });
+    if (row.indexOf('Paid Leads') !== -1 && row.indexOf('Date') !== -1) {
+      h = r;
+      row.forEach(function (name, i) { col[name] = i; });
+      break;
+    }
+  }
+  if (h === -1) return [];
+  const out = [];
+  for (let r = h + 1; r < values.length; r++) {
+    const date = formatDate_(values[r][col['Date']], ss);
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) continue; // skip non-date / junk rows
+    const paid = toNumOrNull_(values[r][col['Paid Leads']]);
+    if (paid === null) {
+      // Monthly tabs pre-list every date of the month; a blank Paid Leads is a
+      // future day with no data yet. Data fills top-down, so stop at the first
+      // empty day (otherwise "today" would jump to the 31st and the day count
+      // and averages would be wrong).
+      if (out.length) break;
+      continue;
+    }
+    out.push({
+      date: date,
+      paidLeads: paid,
+      revenue: toNumOrNull_(values[r][col['Revenue']]),
+      cpl: toNumOrNull_(values[r][col['CPL']]),
+      adjProfit: toNumOrNull_(values[r][col['Adj. Profit']]),
+      roas: toNumOrNull_(values[r][col['ROAS']])
+    });
+  }
+  return out;
+}
+
+// ==== HD cumulative (per-hour running totals) ====
 
 /**
  * Returns the 24 CUMULATIVE hourly values for a labelled row
  * (Today / Benchmark High / Benchmark Low).
  *
- * The real Cumul. Leads tab has TWO blocks, each carrying these same labels:
- *   - a "With Hour"  block — per-hour counts   ← NOT what the dashboard wants
- *   - a "Cumulative" block — running totals    ← what the dashboard needs
- * The per-hour block appears first, so a naive label search grabs the wrong
- * numbers. We therefore anchor on the "Cumulative" section header and read the
- * labelled row beneath it. Hours run 0..23 left-to-right; values sit to the
- * right of the label (a blank separator column is dropped by the numeric filter).
+ * The Cumul. Leads tab has TWO blocks carrying these same labels: a per-hour
+ * block first, then a "Cumulative" block. We anchor on the "Cumulative" header
+ * and read the labelled row beneath it. Hours run 0..23 left-to-right.
  */
 function readCumulRow_(ss, label) {
   const sh = ss.getSheetByName(CUMUL_TAB);
   if (!sh) return new Array(24).fill(0);
   const values = sh.getDataRange().getValues();
 
-  // Locate the "Cumulative" section header; search for the label below it.
   let start = 0;
   for (let r = 0; r < values.length; r++) {
     if (values[r].some(function (v) {
@@ -81,42 +144,97 @@ function readCumulRow_(ss, label) {
   return new Array(24).fill(0);
 }
 
-function readCumulDateForLabel_(ss) {
-  // The cumulative tab's "Today" tracks TODAY(); use the newest daily date.
-  const daily = readDaily_(ss);
-  return daily.length ? daily[daily.length - 1].date : '';
+// ==== ED daily-summary (whole-day leads; no per-hour data) ====
+
+/**
+ * ED leads summary from the ED sheet's current month tab (fallback to the most
+ * recent month with data). Returns null if the ED sheet is unreachable or has
+ * no readable daily table, so the dashboard degrades gracefully.
+ * Reads ONLY the named month tab — never the lead-level PII tab.
+ */
+function readEd_() {
+  try {
+    const ss = SpreadsheetApp.openById(ED_SPREADSHEET_ID);
+    const tz = ss.getSpreadsheetTimeZone();
+    const d = new Date();
+    for (let i = 0; i < 13; i++) {
+      const name = Utilities.formatDate(d, tz, 'MMMM yyyy');
+      const sh = ss.getSheetByName(name);
+      if (sh) {
+        const res = readEdMonth_(sh, ss, name, tz);
+        if (res) return res;
+      }
+      d.setMonth(d.getMonth() - 1);
+    }
+  } catch (err) {
+    // ED sheet unreachable / not authorized — degrade to no ED tile data.
+  }
+  return null;
 }
 
-function readDaily_(ss) {
-  const sh = ss.getSheetByName(DAILY_TAB);
-  if (!sh) return [];
+function readEdMonth_(sh, ss, label, tz) {
   const values = sh.getDataRange().getValues();
   let h = -1;
   const col = {};
   for (let r = 0; r < values.length; r++) {
     const row = values[r].map(function (x) { return String(x).trim(); });
-    if (row.indexOf('Paid Leads') !== -1 && row.indexOf('Date') !== -1) {
+    if (row.indexOf('Date') !== -1 && row.indexOf('Social Leads') !== -1) {
       h = r;
       row.forEach(function (name, i) { col[name] = i; });
       break;
     }
   }
-  if (h === -1) return [];
-  const out = [];
+  if (h === -1) return null;
+
+  const rows = [];
   for (let r = h + 1; r < values.length; r++) {
     const date = formatDate_(values[r][col['Date']], ss);
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) continue; // skip non-date / junk rows
-    out.push({
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      if (rows.length) break; // reached the Total/blank row after the daily rows
+      continue;               // still in a gap before the first data row
+    }
+    const socialRaw = toNumOrNull_(values[r][col['Social Leads']]);
+    if (socialRaw === null) {
+      // Pre-listed future day with no leads yet — stop (tabs fill top-down).
+      if (rows.length) break;
+      continue;
+    }
+    const social = socialRaw;
+    const email = ('Email Leads' in col)
+      ? (toNumOrNull_(values[r][col['Email Leads']]) || 0)
+      : 0;
+    rows.push({
       date: date,
-      paidLeads: toNumOrNull_(values[r][col['Paid Leads']]),
-      revenue: toNumOrNull_(values[r][col['Revenue']]),
-      cpl: toNumOrNull_(values[r][col['CPL']]),
-      adjProfit: toNumOrNull_(values[r][col['Adj. Profit']]),
-      roas: toNumOrNull_(values[r][col['ROAS']])
+      leads: social + email,
+      revenue: ('Revenue' in col) ? toNumOrNull_(values[r][col['Revenue']]) : null,
+      cpl: ('CPL' in col) ? toNumOrNull_(values[r][col['CPL']]) : null,
+      adjProfit: ('Adj. Profit' in col) ? toNumOrNull_(values[r][col['Adj. Profit']]) : null,
+      roas: ('ROAS' in col) ? toNumOrNull_(values[r][col['ROAS']]) : null
     });
   }
-  return out;
+  if (!rows.length) return null;
+
+  const today = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+  let todayRow = null;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].date === today) todayRow = rows[i];
+  }
+  if (!todayRow) todayRow = rows[rows.length - 1]; // latest available day
+
+  let mtd = 0;
+  for (let i = 0; i < rows.length; i++) mtd += rows[i].leads;
+
+  return {
+    date: todayRow.date,
+    label: label,
+    todayLeads: todayRow.leads,
+    monthToDate: mtd,
+    avgPerDay: rows.length ? mtd / rows.length : null,
+    daily: rows
+  };
 }
+
+// ==== shared helpers ====
 
 function toNumOrNull_(v) {
   if (v === '' || v === null || v === undefined) return null;

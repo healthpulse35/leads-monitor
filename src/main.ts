@@ -15,7 +15,9 @@ import {
 import { destroyChart, renderChart } from "./chart.ts";
 import { renderFlag } from "./flag.ts";
 import { renderTable } from "./table.ts";
-import type { AppState, LeadsData, SyncStatus } from "./types.ts";
+import { renderTiles } from "./tiles.ts";
+import { renderEdView } from "./edview.ts";
+import type { AppState, LeadsData, SyncStatus, Vertical } from "./types.ts";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (§3.4)
 
@@ -23,6 +25,7 @@ const app = document.getElementById("app") as HTMLElement;
 
 let state: AppState | null = null;
 let chartMode: "cumulative" | "hourly" = "cumulative";
+let vertical: Vertical = "hd"; // which tile's detail is shown below
 let fetching = false;
 
 // ---------------------------------------------------------------------------
@@ -146,6 +149,11 @@ function render(): void {
   const s = state;
   const month = monthLabel(s.data.today.date);
 
+  const detail =
+    vertical === "ed"
+      ? renderEdView(s.data)
+      : `${stripHtml(s.data)}${renderFlag(s.data)}${chartCardHtml(s.data)}${renderTable(s.data)}`;
+
   app.innerHTML = `
     <header class="header">
       <div>
@@ -154,16 +162,30 @@ function render(): void {
       </div>
       ${headerActions(s.status, s.syncedAt)}
     </header>
-    ${stripHtml(s.data)}
-    ${renderFlag(s.data)}
-    ${chartCardHtml(s.data)}
-    ${renderTable(s.data)}
+    ${renderTiles(s.data, vertical)}
+    ${detail}
     ${footnoteHtml(s)}
   `;
 
-  drawChart();
-  wireToggle();
+  if (vertical === "hd") {
+    drawChart();
+    wireToggle();
+  }
+  wireTiles();
   wireRefresh();
+}
+
+/** Clicking a tile switches which vertical's detail (graph/table) is shown. */
+function wireTiles(): void {
+  const tiles = app.querySelectorAll<HTMLButtonElement>(".tile[data-vertical]");
+  tiles.forEach((tile) => {
+    tile.addEventListener("click", () => {
+      const v = tile.dataset.vertical as Vertical;
+      if (v === vertical) return;
+      vertical = v;
+      render();
+    });
+  });
 }
 
 /** Wire the manual "force sync" button. Spins while a fetch is in flight. */

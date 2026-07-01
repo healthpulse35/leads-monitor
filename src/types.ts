@@ -10,6 +10,31 @@ export interface DailyRow {
   roas: number | null;
 }
 
+/** One ED day (mirrors DailyRow, but leads = Social + Email). */
+export interface EdRow {
+  date: string; // "DD/MM/YYYY"
+  leads: number | null; // Social + Email leads
+  revenue: number | null;
+  cpl: number | null;
+  adjProfit: number | null;
+  roas: number | null;
+}
+
+/**
+ * ED leads summary (§ tiles). ED has no per-hour/cumulative tab, so today is a
+ * whole-day figure read from the ED sheet's current-month tab. Optional so the
+ * dashboard degrades gracefully when the endpoint predates this field or the
+ * ED sheet is unreachable.
+ */
+export interface EdSummary {
+  date: string; // "DD/MM/YYYY" — the day todayLeads is for (latest ED day)
+  label: string; // source tab, e.g. "June 2026"
+  todayLeads: number | null; // Social + Email leads for that day
+  monthToDate: number | null; // Σ leads for the month so far
+  avgPerDay: number | null; // monthToDate / days elapsed
+  daily: EdRow[]; // one per day, oldest -> newest (drives the ED table/strip)
+}
+
 export interface LeadsData {
   syncedAt: string; // ISO timestamp, sheet timezone
   today: {
@@ -22,9 +47,13 @@ export interface LeadsData {
     low: number[]; // length 24, cumulative
   };
   daily: DailyRow[]; // one per day, oldest -> newest
+  ed?: EdSummary | null; // ED leads tile source (optional)
 }
 
 export type SyncStatus = "syncing" | "live" | "snapshot";
+
+/** Which vertical's detail (graph/table) is shown below the tiles. */
+export type Vertical = "hd" | "ed";
 
 export interface AppState {
   data: LeadsData;

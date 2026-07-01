@@ -1,7 +1,7 @@
 // Data fetching: hit the endpoint, validate the shape, fall back to the
 // bundled fixture so the screen is never blank (§3.4).
 
-import type { LeadsData } from "./types.ts";
+import type { EdRow, EdSummary, LeadsData } from "./types.ts";
 
 // Resolved at build time. Empty when no live endpoint is configured.
 const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined) ?? "";
@@ -80,7 +80,41 @@ export function validate(raw: unknown): LeadsData {
       high: pad24(benchmark.high as unknown[]),
       low: pad24(benchmark.low as unknown[]),
     },
-    daily: (d.daily as unknown[]).map(normalizeRow),
+    // Drop fully-empty rows defensively (monthly tabs pre-list every date, so a
+    // stale payload could carry blank future days). A real day always has at
+    // least paid leads or revenue.
+    daily: (d.daily as unknown[])
+      .map(normalizeRow)
+      .filter((r) => r.paidLeads != null || r.revenue != null),
+    ed: normalizeEd(d.ed),
+  };
+}
+
+/** ED tile block — optional; missing/malformed collapses to null (tile shows "—"). */
+function normalizeEd(raw: unknown): EdSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  return {
+    date: typeof e.date === "string" ? e.date : "",
+    label: typeof e.label === "string" ? e.label : "",
+    todayLeads: num(e.todayLeads),
+    monthToDate: num(e.monthToDate),
+    avgPerDay: num(e.avgPerDay),
+    daily: Array.isArray(e.daily)
+      ? e.daily.map(normalizeEdRow).filter((r) => r.leads != null || r.revenue != null)
+      : [],
+  };
+}
+
+function normalizeEdRow(raw: unknown): EdRow {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    date: typeof r.date === "string" ? r.date : "",
+    leads: num(r.leads),
+    revenue: num(r.revenue),
+    cpl: num(r.cpl),
+    adjProfit: num(r.adjProfit),
+    roas: num(r.roas),
   };
 }
 

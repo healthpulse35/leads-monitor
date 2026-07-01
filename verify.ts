@@ -66,5 +66,12 @@ check("01/06 (1.73) chip", roasChipTone(1.73, med), "green");
 check("06/06 (1.71) chip", roasChipTone(1.71, med), "green");
 check("mid (1.65) chip neutral", roasChipTone(1.65, med), "neutral");
 
+// ED tile
+check("ed today leads", formatInt(data.ed!.todayLeads!), "243");
+check("ed month-to-date", formatInt(data.ed!.monthToDate!), "6,520");
+check("ed date", data.ed!.date, "30/06/2026");
+check("ed daily length", data.ed!.daily.length, 30);
+check("ed daily leads sum", formatInt(data.ed!.daily.reduce((s, r) => s + (r.leads ?? 0), 0)), "6,520");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

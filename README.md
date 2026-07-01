@@ -24,8 +24,12 @@ useful for local dev and as the offline fallback.
 ## Live data
 
 1. Open the Google Sheet → **Extensions ▸ Apps Script**, paste
-   [`apps-script/Code.gs`](apps-script/Code.gs), and confirm the two tab-name
-   constants (`DAILY_TAB`, `CUMUL_TAB`) match the real tabs.
+   [`apps-script/Code.gs`](apps-script/Code.gs). Monthly tabs are resolved
+   automatically by name (`"June 2026"`, `"July 2026"`, …) for **both** the HD
+   and ED sheets — no constant to bump each month. It reads the current month's
+   tab, falling back to the most recent month that has data. Confirm the two
+   spreadsheet IDs (`HD_SPREADSHEET_ID`, `ED_SPREADSHEET_ID`) and `CUMUL_TAB`.
+   Deploy *Execute as: Me* so it can read both sheets you own.
 2. **Deploy ▸ New deployment ▸ Web app**, *Execute as: Me*, *Who has access:
    Anyone*. Copy the resulting `…/exec` URL.
 3. Put it in `.env`:
@@ -37,9 +41,23 @@ useful for local dev and as the offline fallback.
    failure it falls back to the bundled snapshot.
 
 The Apps Script reads **only** the daily-summary tab and the `Cumul. Leads` tab
-and parses money/percent cells to plain numbers server-side. It never touches
-the lead-level/PII tabs. See `apps-script/Code.gs` and the build spec for the
-JSON contract.
+(HD) plus the ED monthly daily-summary tab, and parses money/percent cells to
+plain numbers server-side. It never touches the lead-level/PII tabs (including
+the ED sheet's lead-level tab). See `apps-script/Code.gs` and the build spec for
+the JSON contract.
+
+The two top-of-page tiles read from this same payload and **double as a vertical
+selector** (colour-coded — HD purple, ED amber): **HD Leads** = today's
+cumulative total vs the time-of-day typical (from `today.cumulative` +
+`benchmark`), and **ED Leads** = today's whole-day total from the optional `ed`
+block (`ed.todayLeads`, with `ed.monthToDate` as context). ED has no per-hour
+data, so it shows no intraday pace. If `ed` is absent (older endpoint) the tile
+shows "—".
+
+Clicking a tile switches the detail below it (`vertical` state in `main.ts`):
+**HD** shows the "…so far" strip + pace flag + chart + HD daily table; **ED**
+shows an "ED · <month> so far" strip + the ED daily table (`ed.daily[]`;
+`src/edview.ts`). HD is the default. There is no ED chart by design.
 
 ## Deploy
 

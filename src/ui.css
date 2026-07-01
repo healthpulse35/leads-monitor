@@ -16,6 +16,16 @@
   --amber: #b45309;
   --amber-bg: #fdf3e3;
 
+  /* Vertical accents — HD purple, ED amber (tile colour-coding). */
+  --hd: #7c3aed; /* accent text */
+  --hd-border: #b79bf3; /* purple border */
+  --hd-bg: #f6f3ff; /* very light purple */
+  --hd-ring: rgba(124, 58, 237, 0.28);
+  --ed: #b45309; /* accent text */
+  --ed-border: #f0b667; /* amber border */
+  --ed-bg: #fff8ee; /* very light amber */
+  --ed-ring: rgba(217, 119, 6, 0.28);
+
   --radius: 16px;
   --shadow: 0 1px 2px rgba(16, 32, 59, 0.04);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
@@ -251,6 +261,146 @@ body {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------ HD / ED "today" tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tile {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.05s ease;
+}
+
+/* Colour-coded per vertical so it's obvious which is which. */
+.tile--hd {
+  border-color: var(--hd-border);
+  background: var(--hd-bg);
+}
+
+.tile--ed {
+  border-color: var(--ed-border);
+  background: var(--ed-bg);
+}
+
+.tile--hd .tile__name {
+  color: var(--hd);
+}
+
+.tile--ed .tile__name {
+  color: var(--ed);
+}
+
+.tile:hover {
+  box-shadow: 0 2px 8px rgba(16, 32, 59, 0.1);
+}
+
+.tile:active {
+  transform: translateY(1px);
+}
+
+/* Selected tile: accent ring + lift so the shown vertical reads clearly. */
+.tile.is-active {
+  box-shadow: 0 0 0 3px var(--ring, var(--line)), var(--shadow);
+}
+
+.tile--hd.is-active {
+  --ring: var(--hd-ring);
+}
+
+.tile--ed.is-active {
+  --ring: var(--ed-ring);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.tile__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tile__name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tile__tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tile__value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.tile__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.tile__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tile__trend--green {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.tile__trend--red {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.tile__trend--blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.tile__trend--muted {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.tile__note {
+  font-size: 11px;
   color: var(--muted);
 }
 
