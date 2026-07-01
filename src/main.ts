@@ -1,7 +1,7 @@
 // Bootstrap: fetch -> state -> render; 5-min poll; refresh on tab focus (§3.4).
 
 import "./ui.css";
-import { fetchData } from "./data.ts";
+import { fetchData, HAS_LIVE_ENDPOINT } from "./data.ts";
 import {
   aggregate,
   clockHHMM,
@@ -21,12 +21,20 @@ import type { AppState, LeadsData, SyncStatus, Vertical } from "./types.ts";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (§3.4)
 
+// Self-heal: if a load lands on the stale snapshot while a live endpoint exists
+// (e.g. the endpoint was mid cold-start), retry a few times quickly instead of
+// waiting the full 5-minute poll — so opening the app reliably reaches "Live".
+const HEAL_DELAY_MS = 6_000;
+const MAX_HEAL_ATTEMPTS = 3;
+
 const app = document.getElementById("app") as HTMLElement;
 
 let state: AppState | null = null;
 let chartMode: "cumulative" | "hourly" = "cumulative";
 let vertical: Vertical = "hd"; // which tile's detail is shown below
 let fetching = false;
+let healTimer: number | undefined; // pending self-heal retry
+let healAttempts = 0; // fast retries used since the last successful live sync
 
 // ---------------------------------------------------------------------------
 // Status pill (§6)
@@ -263,6 +271,30 @@ async function refresh(): Promise<void> {
     fetching = false;
   }
   render();
+  scheduleSelfHeal();
+}
+
+/**
+ * When we're showing the snapshot but a live endpoint exists, retry soon (a few
+ * times) so a cold-start miss upgrades to live within seconds. A successful live
+ * sync resets the budget; the regular 5-min poll keeps trying after that.
+ */
+function scheduleSelfHeal(): void {
+  if (healTimer !== undefined) {
+    clearTimeout(healTimer);
+    healTimer = undefined;
+  }
+  if (!state || !HAS_LIVE_ENDPOINT) return;
+  if (!state.isFixture) {
+    healAttempts = 0; // reached live — reset the budget
+    return;
+  }
+  if (healAttempts >= MAX_HEAL_ATTEMPTS) return; // give up fast retries; poll continues
+  healAttempts++;
+  healTimer = window.setTimeout(() => {
+    healTimer = undefined;
+    void refresh();
+  }, HEAL_DELAY_MS);
 }
 
 function init(): void {
@@ -284,9 +316,13 @@ function init(): void {
   // Poll every 5 minutes.
   setInterval(() => void refresh(), POLL_INTERVAL_MS);
 
-  // Refresh when the tab becomes visible again (reopening the phone).
+  // Refresh when the tab becomes visible again (reopening the phone). Reset the
+  // self-heal budget so every reopen gets a fresh set of quick retries.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void refresh();
+    if (document.visibilityState === "visible") {
+      healAttempts = 0;
+      void refresh();
+    }
   });
 
   // Clean up the chart on unload (avoids leaks on bfcache restores).

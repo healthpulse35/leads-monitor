@@ -6,12 +6,21 @@ import type { EdRow, EdSummary, LeadsData } from "./types.ts";
 // Resolved at build time. Empty when no live endpoint is configured.
 const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined) ?? "";
 
+/** True when a live endpoint is configured (lets the UI schedule self-heal retries). */
+export const HAS_LIVE_ENDPOINT = Boolean(DATA_URL);
+
 // Vite serves /public at the root; `base: "./"` makes this relative in builds.
 const FIXTURE_URL = `${import.meta.env.BASE_URL}leads-sample.json`;
 
-// Abort a live fetch that stalls, so a slow/unreachable endpoint falls back to
-// the fixture instead of leaving the UI stuck on "Syncing…" (§3.4).
-const FETCH_TIMEOUT_MS = 12_000;
+// Abort a live fetch that stalls. The Apps Script endpoint opens two sheets and
+// cold-starts slowly (warm ≈ 5-8s, cold can be 15s+), so give it real headroom
+// before falling back — a 12s cap was aborting cold starts and showing the
+// stale snapshot on open.
+const FETCH_TIMEOUT_MS = 20_000;
+
+// Attempts at the live endpoint before falling back to the fixture. A cold
+// start's first hit warms the instance, so a retry usually returns quickly.
+const LIVE_ATTEMPTS = 2;
 
 export interface FetchResult {
   data: LeadsData;
@@ -19,22 +28,32 @@ export interface FetchResult {
 }
 
 /**
- * Fetch live data when an endpoint is configured; otherwise (or on any
- * failure) load the bundled fixture. Caller decides how to surface which
+ * Fetch live data when an endpoint is configured; otherwise (or after all
+ * retries fail) load the bundled fixture. Caller decides how to surface which
  * source won via the status pill.
  */
 export async function fetchData(): Promise<FetchResult> {
   if (DATA_URL) {
-    try {
-      const live = await fetchJson(withCacheBust(DATA_URL));
-      return { data: validate(live), isFixture: false };
-    } catch (err) {
-      console.warn("[leads-monitor] live fetch failed, using snapshot:", err);
+    for (let attempt = 1; attempt <= LIVE_ATTEMPTS; attempt++) {
+      try {
+        const live = await fetchJson(withCacheBust(DATA_URL));
+        return { data: validate(live), isFixture: false };
+      } catch (err) {
+        console.warn(
+          `[leads-monitor] live fetch attempt ${attempt}/${LIVE_ATTEMPTS} failed:`,
+          err,
+        );
+        if (attempt < LIVE_ATTEMPTS) await delay(700);
+      }
     }
   }
-  // No endpoint configured, or live fetch failed.
+  // No endpoint configured, or every live attempt failed.
   const fixture = await fetchJson(withCacheBust(FIXTURE_URL));
   return { data: validate(fixture), isFixture: true };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function withCacheBust(url: string): string {
