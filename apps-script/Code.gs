@@ -1,5 +1,5 @@
 /**
- * Leads Monitor — Apps Script data endpoint (§3.2).
+ * Leads Monitor - Apps Script data endpoint (3.2).
  *
  * Reads ONLY aggregate tabs (HD daily summary + Cumul. Leads, and the ED daily
  * summary) and returns the JSON contract the dashboard expects. It never touches
@@ -10,13 +10,13 @@
  * falling back to the most recent month that actually has data (so nothing
  * breaks on the 1st of a month before that tab is populated). No hand-editing.
  *
- * Deploy: Extensions ▸ Apps Script ▸ paste this file ▸ Deploy ▸ New deployment
+ * Deploy: Extensions > Apps Script > paste this file > Deploy > New deployment
  *   - Type: Web app
  *   - Execute as: Me            (so it can read both sheets you own)
  *   - Who has access: Anyone
  * Copy the resulting /exec URL into the dashboard's .env as VITE_DATA_URL.
  * (Updating an EXISTING deployment keeps the same URL; a NEW deployment mints
- *  a new one — update .env if it changes.)
+ *  a new one - update .env if it changes.)
  */
 
 // ==== CONFIG ====
@@ -150,7 +150,7 @@ function readCumulRow_(ss, label) {
  * ED leads summary from the ED sheet's current month tab (fallback to the most
  * recent month with data). Returns null if the ED sheet is unreachable or has
  * no readable daily table, so the dashboard degrades gracefully.
- * Reads ONLY the named month tab — never the lead-level PII tab.
+ * Reads ONLY the named month tab - never the lead-level PII tab.
  */
 function readEd_() {
   try {
@@ -167,7 +167,7 @@ function readEd_() {
       d.setMonth(d.getMonth() - 1);
     }
   } catch (err) {
-    // ED sheet unreachable / not authorized — degrade to no ED tile data.
+    // ED sheet unreachable / not authorized - degrade to no ED tile data.
   }
   return null;
 }
@@ -195,7 +195,7 @@ function readEdMonth_(sh, ss, label, tz) {
     }
     const socialRaw = toNumOrNull_(values[r][col['Social Leads']]);
     if (socialRaw === null) {
-      // Pre-listed future day with no leads yet — stop (tabs fill top-down).
+      // Pre-listed future day with no leads yet - stop (tabs fill top-down).
       if (rows.length) break;
       continue;
     }
