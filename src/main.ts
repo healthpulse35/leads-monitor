@@ -41,16 +41,26 @@ let healAttempts = 0; // fast retries used since the last successful live sync
 // ---------------------------------------------------------------------------
 
 function pillHtml(status: SyncStatus, syncedAt: string): string {
+  const t = clockHHMM(syncedAt);
   let cls = "pill--live";
-  let text = `Live · synced ${clockHHMM(syncedAt)}`;
+  let text = `Live · synced ${t}`;
   if (status === "syncing") {
     cls = "pill--syncing";
     text = "Syncing…";
-  } else if (status === "snapshot") {
+  } else if (status === "cached") {
+    // Last good live data replayed from this device (sync is currently failing).
     cls = "pill--snapshot";
-    text = `Saved snapshot${syncedAt ? ` · ${clockHHMM(syncedAt)}` : ""}`;
+    text = `Offline · last synced${t ? ` ${t}` : ""}`;
+  } else if (status === "snapshot") {
+    // Bundled sample — only shown when there's no live data or cache at all.
+    cls = "pill--snapshot";
+    text = "Sample data";
   }
   return `<span class="pill ${cls}"><span class="pill__dot"></span>${text}</span>`;
+}
+
+function sourceToStatus(source: AppState["source"]): SyncStatus {
+  return source === "live" ? "live" : source === "cache" ? "cached" : "snapshot";
 }
 
 function setPill(status: SyncStatus): void {
@@ -145,9 +155,14 @@ function legendHtml(): string {
 }
 
 function footnoteHtml(s: AppState): string {
-  const source = s.isFixture
-    ? "Source: bundled snapshot (live sheet unreachable)"
-    : "Source: Google Sheet (Cumul. Leads + monthly tab)";
+  let source: string;
+  if (s.source === "live") {
+    source = "Source: Google Sheet (Cumul. Leads + monthly tab)";
+  } else if (s.source === "cache") {
+    source = "Source: last live sync on this device (offline)";
+  } else {
+    source = "Source: bundled sample (no live data yet)";
+  }
   const when = s.syncedAt ? ` · last sync ${clockHHMM(s.syncedAt)}` : "";
   return `<p class="footnote">${esc(source)}${esc(when)}</p>`;
 }
@@ -168,7 +183,7 @@ function render(): void {
         <h1 class="header__title">Leads Monitor</h1>
         <p class="header__subtitle">${esc(month)} · today vs typical day</p>
       </div>
-      ${headerActions(s.status, s.syncedAt)}
+      ${headerActions(sourceToStatus(s.source), s.syncedAt)}
     </header>
     ${renderTiles(s.data, vertical)}
     ${detail}
@@ -249,19 +264,13 @@ async function refresh(): Promise<void> {
   if (state) setPill("syncing");
 
   try {
-    const { data, isFixture } = await fetchData();
-    state = {
-      data,
-      status: isFixture ? "snapshot" : "live",
-      syncedAt: data.syncedAt,
-      isFixture,
-      chartMode,
-    };
+    const { data, source } = await fetchData();
+    state = { data, source, syncedAt: data.syncedAt, chartMode };
   } catch (err) {
     // validate() can still throw if even the fixture is malformed.
     console.error("[leads-monitor] failed to load any data:", err);
     if (state) {
-      state.status = "snapshot";
+      // Keep showing the last good data we already have.
     } else {
       app.innerHTML = `<p class="fatal">Couldn't load leads data. Check the data source and reload.</p>`;
       fetching = false;
@@ -285,7 +294,7 @@ function scheduleSelfHeal(): void {
     healTimer = undefined;
   }
   if (!state || !HAS_LIVE_ENDPOINT) return;
-  if (!state.isFixture) {
+  if (state.source === "live") {
     healAttempts = 0; // reached live — reset the budget
     return;
   }

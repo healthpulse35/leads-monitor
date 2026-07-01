@@ -18,8 +18,10 @@ npm run preview    # serve the production build locally
 ```
 
 With no data endpoint configured the app runs entirely off the bundled fixture
-(`public/leads-sample.json`) and the status pill reads **"Saved snapshot"** —
-useful for local dev and as the offline fallback.
+(`public/leads-sample.json`) and the status pill reads **"Sample data"** —
+useful for local dev. Once live data has loaded at least once, an offline/failed
+sync instead replays the last live payload from `localStorage` (see
+[Sync resilience](#live-data)).
 
 ## Live data
 
@@ -37,8 +39,16 @@ useful for local dev and as the offline fallback.
    VITE_DATA_URL=https://script.google.com/macros/s/XXXX/exec
    ```
 4. `npm run build` (or `npm run dev`). The app now fetches live JSON, polls
-   every 5 minutes, and re-fetches when the tab regains focus. On any fetch
-   failure it falls back to the bundled snapshot.
+   every 5 minutes, and re-fetches when the tab regains focus.
+
+**Sync resilience (`src/data.ts` / `src/main.ts`).** The Apps Script endpoint
+opens two sheets and can cold-start slowly, so a live fetch gets a 20s timeout
+and two attempts. On success the payload is cached to `localStorage`. When a
+sync fails, the app **replays the last successful live payload from this device**
+(pill: *"Offline · last synced HH:MM"*) rather than the months-old bundled
+sample — the sample (*"Sample data"*) only appears with no live data and no
+cache. If a load still lands on non-live while an endpoint is configured, it
+self-heals with a few quick retries instead of waiting the full 5-minute poll.
 
 The Apps Script reads **only** the daily-summary tab and the `Cumul. Leads` tab
 (HD) plus the ED monthly daily-summary tab, and parses money/percent cells to

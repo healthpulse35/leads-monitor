@@ -1,7 +1,7 @@
 // Data fetching: hit the endpoint, validate the shape, fall back to the
 // bundled fixture so the screen is never blank (§3.4).
 
-import type { EdRow, EdSummary, LeadsData } from "./types.ts";
+import type { DataSource, EdRow, EdSummary, LeadsData } from "./types.ts";
 
 // Resolved at build time. Empty when no live endpoint is configured.
 const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined) ?? "";
@@ -18,26 +18,32 @@ const FIXTURE_URL = `${import.meta.env.BASE_URL}leads-sample.json`;
 // stale snapshot on open.
 const FETCH_TIMEOUT_MS = 20_000;
 
-// Attempts at the live endpoint before falling back to the fixture. A cold
-// start's first hit warms the instance, so a retry usually returns quickly.
+// Attempts at the live endpoint before falling back. A cold start's first hit
+// warms the instance, so a retry usually returns quickly.
 const LIVE_ATTEMPTS = 2;
+
+// Last successful live payload, kept in localStorage so that when a sync fails
+// we can replay the most recent data THIS device saw (e.g. from earlier today)
+// instead of the months-old bundled sample.
+const CACHE_KEY = "leads-monitor:last-live";
 
 export interface FetchResult {
   data: LeadsData;
-  isFixture: boolean;
+  source: DataSource;
 }
 
 /**
- * Fetch live data when an endpoint is configured; otherwise (or after all
- * retries fail) load the bundled fixture. Caller decides how to surface which
- * source won via the status pill.
+ * Fetch live data when an endpoint is configured. On failure, replay the last
+ * successful live payload from localStorage; only if there's none do we fall
+ * back to the bundled fixture. Caller surfaces the source via the status pill.
  */
 export async function fetchData(): Promise<FetchResult> {
   if (DATA_URL) {
     for (let attempt = 1; attempt <= LIVE_ATTEMPTS; attempt++) {
       try {
-        const live = await fetchJson(withCacheBust(DATA_URL));
-        return { data: validate(live), isFixture: false };
+        const data = validate(await fetchJson(withCacheBust(DATA_URL)));
+        saveCache(data);
+        return { data, source: "live" };
       } catch (err) {
         console.warn(
           `[leads-monitor] live fetch attempt ${attempt}/${LIVE_ATTEMPTS} failed:`,
@@ -46,10 +52,32 @@ export async function fetchData(): Promise<FetchResult> {
         if (attempt < LIVE_ATTEMPTS) await delay(700);
       }
     }
+    // Live failed — prefer the last good live snapshot from this device.
+    const cached = loadCache();
+    if (cached) return { data: cached, source: "cache" };
   }
-  // No endpoint configured, or every live attempt failed.
+  // No endpoint configured, or live failed with no cache to fall back on.
   const fixture = await fetchJson(withCacheBust(FIXTURE_URL));
-  return { data: validate(fixture), isFixture: true };
+  return { data: validate(fixture), source: "fixture" };
+}
+
+/** Persist the latest live payload; ignore quota/private-mode errors. */
+function saveCache(data: LeadsData): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
+}
+
+/** Load and re-validate the cached payload (guards against schema drift). */
+function loadCache(): LeadsData | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? validate(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
 }
 
 function delay(ms: number): Promise<void> {

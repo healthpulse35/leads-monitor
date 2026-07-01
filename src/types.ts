@@ -50,15 +50,22 @@ export interface LeadsData {
   ed?: EdSummary | null; // ED leads tile source (optional)
 }
 
-export type SyncStatus = "syncing" | "live" | "snapshot";
+export type SyncStatus = "syncing" | "live" | "cached" | "snapshot";
+
+/**
+ * Where the currently-shown data came from:
+ * - live: fresh from the endpoint
+ * - cache: the last successful live payload, replayed from localStorage
+ * - fixture: the bundled sample (only when there's no live data or cache)
+ */
+export type DataSource = "live" | "cache" | "fixture";
 
 /** Which vertical's detail (graph/table) is shown below the tiles. */
 export type Vertical = "hd" | "ed";
 
 export interface AppState {
   data: LeadsData;
-  status: SyncStatus;
+  source: DataSource;
   syncedAt: string; // ISO of the data currently shown
-  isFixture: boolean; // true when showing the bundled snapshot
   chartMode: "cumulative" | "hourly";
 }
